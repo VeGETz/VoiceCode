@@ -12,6 +12,10 @@
   },
   "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "azure", "voice"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vegetz/voice-code.git"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
