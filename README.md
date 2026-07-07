@@ -166,6 +166,12 @@ pnpm install
 node scripts/tts-bridge.js   # test the bridge
 ```
 
+## ⚠️ Disclaimer
+
+This project was **100% created by AI**. Use at your own risk.
+
+Using this software with **Gemini TTS** or **Azure Speech** will incur costs on your respective cloud accounts. The author takes no responsibility for any charges, damages, or issues arising from the use of this software.
+
 ## 📄 License
 
 [MIT](LICENSE)
