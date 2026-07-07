@@ -1,0 +1,24 @@
+{
+  "name": "voice-code",
+  "version": "1.0.0",
+  "description": "Text-to-speech for Claude Code via Gemini TTS",
+  "type": "module",
+  "bin": {
+    "voice-code": "./bin/voice-code.js"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.js",
+    "bridge": "node scripts/tts-bridge.js"
+  },
+  "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "voice"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "@inquirer/prompts": "^7.0.0",
+    "marked": "^15.0.0",
+    "play-sound": "^1.1.6"
+  }
+}
