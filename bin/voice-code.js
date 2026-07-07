@@ -14,7 +14,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { input, select, confirm, password } from '@inquirer/prompts';
 import { loadConfig, saveConfig, getApiKey, CONFIG_DIR } from '../src/config.js';
 import { cleanForSpeech } from '../src/text-cleaner.js';
@@ -418,6 +418,66 @@ async function cmdVoices() {
   console.log(`\nChange with: voice-code setup\n`);
 }
 
+async function cmdUninstall() {
+  console.log('\n🗑️  Voice Code Uninstall\n');
+
+  const confirmed = await confirm({
+    message: 'Remove hook from Claude Code and delete all config?',
+    default: false,
+  });
+
+  if (!confirmed) {
+    console.log('  Cancelled.');
+    return;
+  }
+
+  // Remove hook from Claude settings
+  if (existsSync(CLAUDE_SETTINGS)) {
+    try {
+      const settings = JSON.parse(readFileSync(CLAUDE_SETTINGS, 'utf8'));
+      if (settings.hooks?.MessageDisplay) {
+        settings.hooks.MessageDisplay = settings.hooks.MessageDisplay.filter((group) =>
+          !group.hooks?.some((h) => h.command?.includes('tts-bridge'))
+        );
+        if (settings.hooks.MessageDisplay.length === 0) {
+          delete settings.hooks.MessageDisplay;
+        }
+        if (Object.keys(settings.hooks).length === 0) {
+          delete settings.hooks;
+        }
+        writeFileSync(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2) + '\n');
+        console.log('  ✓ Hook removed from ~/.claude/settings.json');
+      }
+    } catch (err) {
+      console.error('  ✗ Failed to update settings:', err.message);
+    }
+  }
+
+  // Delete config directory
+  try {
+    const { rmSync } = await import('node:fs');
+    if (existsSync(CONFIG_DIR)) {
+      rmSync(CONFIG_DIR, { recursive: true, force: true });
+      console.log('  ✓ Deleted ~/.voice-code/');
+    }
+  } catch (err) {
+    console.error('  ✗ Failed to delete config:', err.message);
+  }
+
+  // Clean up temp files
+  try {
+    const tempDir = join(tmpdir(), 'voice-code');
+    const { rmSync } = await import('node:fs');
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+      console.log('  ✓ Cleaned up temp files');
+    }
+  } catch {}
+
+  console.log('\n✅ Voice Code uninstalled.');
+  console.log('   You can now remove the package: pnpm remove -g @vegetz/voice-code\n');
+}
+
 function cmdLog(lines) {
   const n = parseInt(lines, 10) || 30;
   if (!existsSync(LOG_FILE)) {
@@ -460,6 +520,9 @@ switch (command) {
   case 'log':
     cmdLog(args[0]);
     break;
+  case 'uninstall':
+    cmdUninstall().catch(handleError);
+    break;
   default:
     console.log(`
 🎤 Voice Code — Text-to-speech for Claude Code
@@ -473,6 +536,7 @@ Usage:
   voice-code toggle         Toggle TTS
   voice-code test [text]    Test TTS
   voice-code voices         List voices
+  voice-code uninstall      Remove hook and config
   voice-code log [n]        Show last n log entries (default 30)
 `);
 }

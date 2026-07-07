@@ -60,6 +60,7 @@ That's it. Claude will start speaking.
 | `voice-code toggle` | Toggle TTS on/off |
 | `voice-code test [text]` | Test TTS with sample text |
 | `voice-code voices` | List available voices |
+| `voice-code uninstall` | Remove hook and config, then uninstall package |
 | `voice-code log [n]` | Show last n log entries |
 
 ## 🔑 API Keys
