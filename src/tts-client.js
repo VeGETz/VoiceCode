@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { getApiKey, loadConfig } from './config.js';
 import { log } from './logger.js';
+import { synthesize as azureSynthesize, listVoices as azureListVoices } from './tts-client-azure.js';
 
 let clientInstance = null;
 
@@ -20,11 +21,36 @@ Style: The "Vocal Smile": The soft palate is raised to keep the tone bright, sun
 ## Transcript:`;
 
 /**
+ * Synthesize text to audio. Routes to the configured provider (Gemini or Azure).
+ * Returns Buffer of WAV audio (PCM, mono, 24kHz, 16-bit).
+ */
+export async function synthesize(text, options = {}) {
+  const config = loadConfig();
+
+  if (options.provider === 'azure' || config.provider === 'azure') {
+    return azureSynthesize(text, options);
+  }
+
+  return synthesizeGemini(text, options);
+}
+
+/**
+ * List available voices for the configured provider.
+ */
+export async function listVoices() {
+  const config = loadConfig();
+  if (config.provider === 'azure') {
+    return azureListVoices();
+  }
+  return null; // Gemini voices are hardcoded in the CLI
+}
+
+/**
  * Synthesize text to audio using Gemini TTS with streaming.
  * Concatinates all audio chunks into a single WAV buffer.
  * Returns Buffer of WAV audio (PCM, mono, 24kHz, 16-bit).
  */
-export async function synthesize(text, options = {}) {
+async function synthesizeGemini(text, options = {}) {
   const config = loadConfig();
   const client = getClient();
 

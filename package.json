@@ -1,7 +1,7 @@
 {
   "name": "voice-code",
   "version": "1.0.0",
-  "description": "Text-to-speech for Claude Code via Gemini TTS",
+  "description": "Text-to-speech for Claude Code (Gemini & Azure)",
   "type": "module",
   "bin": {
     "voice-code": "./bin/voice-code.js"
@@ -10,7 +10,7 @@
     "test": "node --test src/*.test.js",
     "bridge": "node scripts/tts-bridge.js"
   },
-  "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "voice"],
+  "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "azure", "voice"],
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

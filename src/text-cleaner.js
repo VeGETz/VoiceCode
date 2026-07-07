@@ -72,6 +72,7 @@ export function cleanForSpeech(markdown) {
 
   // Post-processing cleanup
   text = stripHtmlTags(text);
+  text = decodeHtmlEntities(text);
   text = cleanUrls(text);
   text = cleanFilePaths(text);
   text = expandAcronyms(text);
@@ -84,6 +85,16 @@ export function cleanForSpeech(markdown) {
 function stripHtmlTags(text) {
   // Safety net: remove any remaining HTML tags
   return text.replace(/<[^>]+>/g, '');
+}
+
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 function cleanUrls(text) {

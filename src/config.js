@@ -6,11 +6,15 @@ const CONFIG_DIR = join(homedir(), '.voice-code');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 const DEFAULTS = {
+  provider: 'gemini',            // 'gemini' or 'azure'
   voice: 'Kore',
   model: 'gemini-3.1-flash-tts-preview',
   enabled: true,
-  playbackDevice: null,    // null = auto-detect
-  apiKeyEnv: 'GEMINI_API_KEY',  // env var name to read key from
+  playbackDevice: null,          // null = auto-detect
+  apiKeyEnv: 'GEMINI_API_KEY',   // env var name to read key from
+  azureKey: null,                // Azure Speech resource key
+  azureRegion: null,             // Azure region (e.g., 'eastus')
+  azureVoice: 'en-US-JennyNeural', // Azure default voice
 };
 
 export function getConfigPath() {
@@ -50,6 +54,18 @@ export function getApiKey() {
     );
   }
   return key;
+}
+
+export function getAzureCredentials() {
+  const config = loadConfig();
+  const key = process.env.AZURE_SPEECH_KEY || config.azureKey;
+  const region = process.env.AZURE_SPEECH_REGION || config.azureRegion;
+  if (!key || !region) {
+    throw new Error(
+      'Azure Speech credentials not found. Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION env vars, or run: voice-code setup'
+    );
+  }
+  return { key, region };
 }
 
 export { CONFIG_DIR, CONFIG_FILE, DEFAULTS };

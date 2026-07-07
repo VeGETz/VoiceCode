@@ -18,7 +18,7 @@ import { homedir } from 'node:os';
 import { input, select, confirm, password } from '@inquirer/prompts';
 import { loadConfig, saveConfig, getApiKey, CONFIG_DIR } from '../src/config.js';
 import { cleanForSpeech } from '../src/text-cleaner.js';
-import { synthesize, resetClient } from '../src/tts-client.js';
+import { synthesize, resetClient, listVoices as fetchProviderVoices } from '../src/tts-client.js';
 import { playAudio, checkPlayback } from '../src/audio-player.js';
 import { LOG_FILE } from '../src/logger.js';
 
@@ -63,11 +63,53 @@ const VOICES = [
 async function setup() {
   console.log('\n🎤 Voice Code Setup\n');
 
-  // Step 1: API Key
-  console.log('Step 1: Gemini API Key');
-  console.log('Get one at: https://aistudio.google.com/apikey\n');
-
+  // Step 1: Provider selection
   const existingConfig = loadConfig();
+
+  console.log('Step 1: Choose TTS provider\n');
+
+  const provider = await select({
+    message: 'Select TTS provider:',
+    choices: [
+      { name: 'Gemini (Google)', value: 'gemini' },
+      { name: 'Azure Speech (Microsoft)', value: 'azure' },
+    ],
+    default: existingConfig.provider || 'gemini',
+  });
+
+  let voice;
+
+  if (provider === 'azure') {
+    // Azure setup flow
+    await setupAzure(existingConfig);
+  } else {
+    // Gemini setup flow
+    await setupGemini(existingConfig);
+  }
+
+  // Playback check
+  console.log('\nStep: Audio playback\n');
+  const playback = await checkPlayback();
+  if (playback.available) {
+    console.log(`  ✓ ${playback.message}`);
+  } else {
+    console.log(`  ✗ ${playback.message}`);
+    console.log('  TTS will still work, but audio may not play.');
+  }
+
+  // Configure Claude Code hook
+  console.log('\nStep: Claude Code hook\n');
+  await configureHook();
+
+  console.log('\n✅ Setup complete! Voice Code is enabled.');
+  console.log('   Claude Code will now speak its responses.\n');
+  console.log('   Commands: voice-code on | off | toggle | test | voices\n');
+}
+
+async function setupGemini(existingConfig) {
+  console.log('\n  Gemini API Key');
+  console.log('  Get one at: https://aistudio.google.com/apikey\n');
+
   const hasEnvKey = process.env.GEMINI_API_KEY;
   const hasConfigKey = existingConfig.apiKey;
 
@@ -78,9 +120,8 @@ async function setup() {
       default: true,
     });
     if (!useExisting) {
-      await promptApiKey();
+      await promptGeminiKey();
     } else {
-      // Save env key to config so hook can access it
       saveConfig({ apiKey: hasEnvKey });
       console.log('  ✓ Key saved to ~/.voice-code/config.json');
     }
@@ -88,11 +129,11 @@ async function setup() {
     console.log(`  ✓ API key found in config (${hasConfigKey.slice(0, 8)}...)`);
   } else {
     console.log('  ✗ No API key found');
-    await promptApiKey();
+    await promptGeminiKey();
   }
 
-  // Step 2: Voice selection
-  console.log('\nStep 2: Choose a voice\n');
+  // Voice selection
+  console.log('\n  Choose a voice\n');
 
   const voice = await select({
     message: 'Select a voice:',
@@ -100,10 +141,10 @@ async function setup() {
       name: `${v.name} (${v.character})`,
       value: v.name,
     })),
-    default: 'Kore',
+    default: existingConfig.voice || 'Kore',
   });
 
-  // Step 3: Preview voice
+  // Preview
   const doPreview = await confirm({
     message: `Preview ${voice}?`,
     default: true,
@@ -112,37 +153,116 @@ async function setup() {
   if (doPreview) {
     console.log(`\n  🔊 Playing preview for ${voice}...`);
     try {
-      const wav = await synthesize(`Hello! I'm ${voice}. I'll be reading Claude's responses for you.`, { voice });
+      const wav = await synthesize(`Hello! I'm ${voice}. I'll be reading Claude's responses for you.`, { voice, provider: 'gemini' });
       await playAudio(wav);
     } catch (err) {
       console.error(`  ✗ Preview failed: ${err.message}`);
     }
   }
 
-  // Step 4: Playback check
-  console.log('\nStep 3: Audio playback\n');
-  const playback = await checkPlayback();
-  if (playback.available) {
-    console.log(`  ✓ ${playback.message}`);
-  } else {
-    console.log(`  ✗ ${playback.message}`);
-    console.log('  TTS will still work, but audio may not play.');
-  }
-
-  // Step 5: Save config
-  saveConfig({ voice, enabled: true });
+  saveConfig({ provider: 'gemini', voice, enabled: true });
   console.log(`\n  ✓ Config saved to ${CONFIG_DIR}/config.json`);
-
-  // Step 6: Configure Claude Code hook
-  console.log('\nStep 4: Claude Code hook\n');
-  await configureHook();
-
-  console.log('\n✅ Setup complete! Voice Code is enabled.');
-  console.log('   Claude Code will now speak its responses.\n');
-  console.log('   Commands: voice-code on | off | toggle | test | voices\n');
 }
 
-async function promptApiKey() {
+async function setupAzure(existingConfig) {
+  // Azure credentials
+  console.log('\n  Azure Speech credentials');
+  console.log('  Get them at: https://portal.azure.com → Speech resource\n');
+
+  const hasEnvKey = process.env.AZURE_SPEECH_KEY;
+  const hasConfigKey = existingConfig.azureKey;
+
+  let azureKey, azureRegion;
+
+  if (hasEnvKey && process.env.AZURE_SPEECH_REGION) {
+    console.log(`  ✓ AZURE_SPEECH_KEY is set (${hasEnvKey.slice(0, 8)}...)`);
+    console.log(`  ✓ AZURE_SPEECH_REGION is set (${process.env.AZURE_SPEECH_REGION})`);
+    const useExisting = await confirm({
+      message: 'Use existing Azure credentials?',
+      default: true,
+    });
+    if (useExisting) {
+      azureKey = hasEnvKey;
+      azureRegion = process.env.AZURE_SPEECH_REGION;
+    }
+  }
+
+  if (!azureKey) {
+    azureKey = await password({
+      message: 'Enter your Azure Speech resource key:',
+      mask: '*',
+    });
+
+    azureRegion = await input({
+      message: 'Enter your Azure region (e.g., eastus, westeurope):',
+      default: existingConfig.azureRegion || 'eastus',
+    });
+  }
+
+  // Save provider + credentials together so listVoices() sees the correct provider
+  saveConfig({ provider: 'azure', azureKey, azureRegion });
+  console.log('  ✓ Credentials saved to ~/.voice-code/config.json');
+
+  // Set env vars so the TTS client can use them
+  process.env.AZURE_SPEECH_KEY = azureKey;
+  process.env.AZURE_SPEECH_REGION = azureRegion;
+
+  // Voice selection — fetch from Azure API
+  console.log('\n  Fetching available voices...\n');
+
+  let azureVoice = existingConfig.azureVoice || 'en-US-JennyNeural';
+
+  try {
+    const voices = await fetchProviderVoices();
+    // Show top English voices as quick picks, with option to see all
+    const englishVoices = voices.filter(v => v.locale?.startsWith('en-'));
+    const otherVoices = voices.filter(v => !v.locale?.startsWith('en-'));
+
+    const voiceChoices = [
+      ...englishVoices.map(v => ({
+        name: `${v.displayName} (${v.locale}, ${v.gender})`,
+        value: v.name,
+      })),
+      ...otherVoices.slice(0, 20).map(v => ({
+        name: `${v.displayName} (${v.locale}, ${v.gender})`,
+        value: v.name,
+      })),
+    ];
+
+    azureVoice = await select({
+      message: 'Select a voice:',
+      choices: voiceChoices,
+      default: azureVoice,
+    });
+  } catch (err) {
+    console.log(`  ⚠ Could not fetch voices: ${err.message}`);
+    azureVoice = await input({
+      message: 'Enter Azure voice name (e.g., en-US-JennyNeural):',
+      default: azureVoice,
+    });
+  }
+
+  // Preview
+  const doPreview = await confirm({
+    message: `Preview ${azureVoice}?`,
+    default: true,
+  });
+
+  if (doPreview) {
+    console.log(`\n  🔊 Playing preview for ${azureVoice}...`);
+    try {
+      const wav = await synthesize(`Hello! I'm ${azureVoice}. I'll be reading Claude's responses for you.`, { voice: azureVoice, provider: 'azure' });
+      await playAudio(wav);
+    } catch (err) {
+      console.error(`  ✗ Preview failed: ${err.message}`);
+    }
+  }
+
+  saveConfig({ provider: 'azure', azureVoice, enabled: true });
+  console.log(`\n  ✓ Config saved to ${CONFIG_DIR}/config.json`);
+}
+
+async function promptGeminiKey() {
   const key = await password({
     message: 'Enter your Gemini API key:',
     mask: '*',
@@ -272,12 +392,28 @@ async function cmdTest(text) {
   }
 }
 
-function cmdVoices() {
+async function cmdVoices() {
   const config = loadConfig();
-  console.log('\n🎤 Available voices:\n');
-  for (const v of VOICES) {
-    const marker = v.name === config.voice ? ' (current)' : '';
-    console.log(`  ${v.name.padEnd(18)} ${v.character}${marker}`);
+
+  if (config.provider === 'azure') {
+    console.log('\n🎤 Azure Speech voices:\n');
+    try {
+      const voices = await fetchProviderVoices();
+      const current = config.azureVoice;
+      for (const v of voices) {
+        const marker = v.name === current ? ' (current)' : '';
+        console.log(`  ${v.name.padEnd(35)} ${v.displayName.padEnd(20)} ${v.locale.padEnd(8)} ${v.gender}${marker}`);
+      }
+      console.log(`\nTotal: ${voices.length} voices`);
+    } catch (err) {
+      console.error(`  ✗ Failed to fetch voices: ${err.message}`);
+    }
+  } else {
+    console.log('\n🎤 Gemini voices:\n');
+    for (const v of VOICES) {
+      const marker = v.name === config.voice ? ' (current)' : '';
+      console.log(`  ${v.name.padEnd(18)} ${v.character}${marker}`);
+    }
   }
   console.log(`\nChange with: voice-code setup\n`);
 }
@@ -319,7 +455,7 @@ switch (command) {
     cmdTest(args.join(' ')).catch(handleError);
     break;
   case 'voices':
-    cmdVoices();
+    cmdVoices().catch(handleError);
     break;
   case 'log':
     cmdLog(args[0]);
@@ -328,8 +464,10 @@ switch (command) {
     console.log(`
 🎤 Voice Code — Text-to-speech for Claude Code
 
+Providers: Gemini (Google), Azure Speech (Microsoft)
+
 Usage:
-  voice-code setup          Guided setup wizard
+  voice-code setup          Guided setup wizard (choose provider & voice)
   voice-code on             Enable TTS
   voice-code off            Disable TTS
   voice-code toggle         Toggle TTS
