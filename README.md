@@ -16,7 +16,15 @@ Voice Code hooks into Claude Code's streaming output, strips code blocks and mar
 ## 🚀 Install
 
 ```bash
-pnpm install -g voice-code
+pnpm install -g https://github.com/VeGETz/VoiceCode.git
+```
+
+Or clone and install locally:
+
+```bash
+git clone https://github.com/VeGETz/VoiceCode.git
+cd VoiceCode
+pnpm install -g .
 ```
 
 Requires Node.js 18+.
@@ -146,8 +154,8 @@ Detected automatically. No extra install needed.
 ## 🤝 Contributing
 
 ```bash
-git clone https://github.com/your-username/voice-code.git
-cd voice-code
+git clone https://github.com/VeGETz/VoiceCode.git
+cd VoiceCode
 pnpm install
 node scripts/tts-bridge.js   # test the bridge
 ```
