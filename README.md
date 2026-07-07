@@ -16,6 +16,12 @@ Voice Code hooks into Claude Code's streaming output, strips code blocks and mar
 ## 🚀 Install
 
 ```bash
+pnpm install -g @vegetz/voice-code
+```
+
+Or install from git:
+
+```bash
 pnpm install -g https://github.com/VeGETz/VoiceCode.git
 ```
 

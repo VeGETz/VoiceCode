@@ -1,5 +1,5 @@
 {
-  "name": "voice-code",
+  "name": "@vegetz/voice-code",
   "version": "1.0.0",
   "description": "Text-to-speech for Claude Code (Gemini & Azure)",
   "type": "module",
