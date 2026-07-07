@@ -1,6 +1,6 @@
 {
   "name": "@vegetz/voice-code",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Text-to-speech for Claude Code (Gemini & Azure)",
   "type": "module",
   "bin": {
