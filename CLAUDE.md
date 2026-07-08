@@ -55,7 +55,7 @@ voice-code/
 │   ├── audio-player.js      # Cross-platform audio playback
 │   └── config.js            # Config load/save (~/.voice-code/config.json)
 └── hooks/
-    └── voice-code.json      # Hook config template
+    └── voice-code.json      # Hook config reference (not used directly; setup writes to ~/.claude/settings.json)
 ```
 
 ## Install & Setup

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /home/vegetz/projects/voice-code/scripts/tts-bridge.js",
+            "command": "node <VOICE_CODE_DIR>/scripts/tts-bridge.js",
             "timeout": 10
           }
         ]
