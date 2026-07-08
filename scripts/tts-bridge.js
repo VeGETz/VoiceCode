@@ -12,7 +12,7 @@
  * will pick them up.
  */
 
-import { cleanForSpeech, splitChunks } from '../src/text-cleaner.js';
+import { cleanForSpeech, splitChunks, hasUnclosedCodeFence } from '../src/text-cleaner.js';
 import { loadConfig } from '../src/config.js';
 import { log } from '../src/logger.js';
 import { exec } from 'node:child_process';
@@ -63,8 +63,8 @@ process.stdin.on('data', (chunk) => {
 });
 
 process.stdin.on('end', () => {
-  // Flush remaining text
-  if (buffer.trim()) {
+  // Flush remaining text (skip if still inside a code block)
+  if (buffer.trim() && !hasUnclosedCodeFence(buffer)) {
     const cleaned = cleanForSpeech(buffer);
     if (cleaned && cleaned.length > 3) {
       appendFileSync(QUEUE_FILE, cleaned + '\n');
@@ -84,24 +84,45 @@ process.stdin.on('error', (err) => {
 const TARGET_CHARS = 300;
 
 function extractAndQueue() {
-  const cleaned = cleanForSpeech(buffer);
-  if (!cleaned) return;
+  // Don't process while inside an incomplete code fence — wait for closing ```
+  if (hasUnclosedCodeFence(buffer)) return;
+
+  // Find the last sentence boundary in the raw buffer.
+  // Only process text up to that boundary; the rest may be incomplete.
+  const lastBoundary = findLastSentenceBoundary(buffer);
+  if (lastBoundary < 0) return;
+
+  const rawComplete = buffer.slice(0, lastBoundary + 1);
+  buffer = buffer.slice(lastBoundary + 1);
+
+  const cleaned = cleanForSpeech(rawComplete);
+  if (!cleaned || cleaned.length < 3) return;
 
   const chunks = splitChunks(cleaned, TARGET_CHARS);
+  for (const chunk of chunks) {
+    if (chunk.length > 5) {
+      log.info(COMPONENT, 'Queued', { chars: chunk.length, text: chunk.slice(0, 100) });
+      appendFileSync(QUEUE_FILE, chunk + '\n');
+    }
+  }
+}
 
-  // Need at least 2 chunks to know the first is complete
-  if (chunks.length >= 2) {
-    const complete = chunks.slice(0, -1);
-    for (const chunk of complete) {
-      if (chunk.length > 5) {
-        log.info(COMPONENT, 'Queued', { chars: chunk.length, text: chunk.slice(0, 100) });
-        appendFileSync(QUEUE_FILE, chunk + '\n');
+/**
+ * Find the index of the last sentence boundary in raw text.
+ * A boundary is ., !, or ? followed by whitespace, newline, or end-of-string.
+ * Returns -1 if no boundary found.
+ */
+function findLastSentenceBoundary(text) {
+  let last = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (/[.!?]/.test(text[i])) {
+      const next = text[i + 1];
+      if (!next || /[\s\n]/.test(next)) {
+        last = i;
       }
     }
-
-    // Store remainder as the new buffer (already cleaned, avoids mismatch)
-    buffer = chunks[chunks.length - 1];
   }
+  return last;
 }
 
 function spawnWorker() {

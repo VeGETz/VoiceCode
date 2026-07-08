@@ -25,7 +25,7 @@ Claude Code (MessageDisplay hook)
 
 ## Architecture
 
-- **CLI** (`bin/voice-code.js`) — Entry point. `voice-code setup` runs guided wizard, `voice-code on/off/toggle` manages hook.
+- **CLI** (`bin/voice-code.js`) — Entry point. `voice-code setup` runs guided wizard, `voice-code on/off/toggle` manages hook, `voice-code shutup` kills playback.
 - **Hook bridge** (`scripts/tts-bridge.js`) — Receives streaming text from Claude Code's `MessageDisplay` hook via stdin. Accumulates chunks until sentence boundaries, then sends cleaned text to TTS.
 - **Text cleaner** (`src/text-cleaner.js`) — Uses `marked` to parse markdown. Strips fenced code blocks, keeps inline code content (drops backticks), replaces URLs with "link", repairs sentence flow.
 - **TTS client** (`src/tts-client.js`) — Routes to configured provider (Gemini, Azure, or Kokoro). Returns WAV audio buffer.
@@ -81,6 +81,7 @@ voice-code setup             # Guided setup wizard (Gemini, Azure, or Kokoro)
 voice-code on                # Enable TTS hook
 voice-code off               # Disable TTS hook
 voice-code toggle            # Toggle TTS on/off
+voice-code shutup            # Stop all audio immediately (clear queue + kill worker)
 voice-code test [text]       # Test TTS with sample text
 voice-code voices            # List available voices
 ```

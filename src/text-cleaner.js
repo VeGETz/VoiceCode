@@ -24,8 +24,8 @@ const renderer = {
   paragraph({ tokens }) {
     return this.parser.parseInline(tokens) + ' ';
   },
-  list({ tokens }) {
-    return this.parser.parse(tokens);
+  list({ items }) {
+    return items.map(item => this.listitem(item)).join('');
   },
   listitem({ tokens }) {
     return this.parser.parseInline(tokens) + '. ';
@@ -56,6 +56,19 @@ const renderer = {
 };
 
 const marked = new Marked({ renderer });
+
+/**
+ * Check if text ends inside an incomplete fenced code block.
+ * Returns true if there's an opening ``` without a matching closing ```.
+ */
+export function hasUnclosedCodeFence(text) {
+  const fenceRegex = /^[`~]{3,}/gm;
+  let count = 0;
+  while (fenceRegex.exec(text) !== null) {
+    count++;
+  }
+  return count % 2 !== 0;
+}
 
 /**
  * Convert markdown to speech-ready plain text.

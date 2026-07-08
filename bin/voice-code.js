@@ -8,13 +8,15 @@
  *   voice-code on             Enable TTS hook
  *   voice-code off            Disable TTS hook
  *   voice-code toggle         Toggle TTS on/off
+ *   voice-code shutup         Stop all audio immediately
  *   voice-code test [text]    Test TTS with sample text
  *   voice-code voices         List available voices
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 import { input, select, confirm, password } from '@inquirer/prompts';
 import { loadConfig, saveConfig, getApiKey, CONFIG_DIR } from '../src/config.js';
 import { cleanForSpeech } from '../src/text-cleaner.js';
@@ -541,6 +543,32 @@ async function cmdUninstall() {
   console.log('   You can now remove the package: pnpm remove -g @vegetz/voice-code\n');
 }
 
+function cmdShutup() {
+  const TEMP_DIR = join(tmpdir(), 'voice-code');
+  const QUEUE_FILE = join(TEMP_DIR, 'queue.txt');
+  const LOCK_FILE = join(TEMP_DIR, 'worker.lock');
+
+  // 1. Clear the queue so no more sentences get spoken
+  if (existsSync(QUEUE_FILE)) {
+    writeFileSync(QUEUE_FILE, '');
+  }
+
+  // 2. Kill any running worker process
+  try {
+    const workerScript = join(import.meta.dirname, '..', 'scripts', 'tts-worker.js');
+    execSync(`pkill -f "${workerScript}"`, { stdio: 'ignore' });
+  } catch {
+    // pkill exits 1 if no process found — that's fine
+  }
+
+  // 3. Remove lock file so next bridge invocation can start fresh
+  if (existsSync(LOCK_FILE)) {
+    try { unlinkSync(LOCK_FILE); } catch {}
+  }
+
+  console.log('🔇 Shut up.');
+}
+
 function cmdLog(lines) {
   const n = parseInt(lines, 10) || 30;
   if (!existsSync(LOG_FILE)) {
@@ -586,6 +614,9 @@ switch (command) {
   case 'uninstall':
     cmdUninstall().catch(handleError);
     break;
+  case 'shutup':
+    cmdShutup();
+    break;
   default:
     console.log(`
 🎤 Voice Code — Text-to-speech for Claude Code
@@ -597,6 +628,7 @@ Usage:
   voice-code on             Enable TTS
   voice-code off            Disable TTS
   voice-code toggle         Toggle TTS
+  voice-code shutup         Stop all audio immediately
   voice-code test [text]    Test TTS
   voice-code voices         List voices
   voice-code uninstall      Remove hook and config
