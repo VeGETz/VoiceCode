@@ -1,7 +1,7 @@
 {
   "name": "@vegetz/voice-code",
   "version": "1.0.4",
-  "description": "Text-to-speech for Claude Code (Gemini & Azure)",
+  "description": "Text-to-speech for Claude Code (Gemini, Azure & Kokoro)",
   "type": "module",
   "bin": {
     "voice-code": "./bin/voice-code.js"
@@ -10,7 +10,7 @@
     "test": "node --test src/*.test.js",
     "bridge": "node scripts/tts-bridge.js"
   },
-  "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "azure", "voice"],
+  "keywords": ["claude-code", "tts", "text-to-speech", "gemini", "azure", "kokoro", "voice"],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
   "dependencies": {
     "@google/genai": "^1.0.0",
     "@inquirer/prompts": "^7.0.0",
+    "kokoro-js": "^1.2.1",
     "marked": "^15.0.0",
     "play-sound": "^1.1.6"
   }

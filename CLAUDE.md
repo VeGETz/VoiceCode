@@ -18,7 +18,7 @@ Claude Code (MessageDisplay hook)
 
 - **Runtime**: Node.js 18+
 - **Install**: `pnpm install -g voice-code` → `voice-code setup` (guided wizard)
-- **TTS**: `@google/genai` (official Gemini SDK)
+- **TTS**: `@google/genai` (Gemini), Azure Speech REST API, `kokoro-js` (local, free)
 - **Markdown**: `marked` (parse + custom renderer)
 - **CLI wizard**: `@inquirer/prompts`
 - **Audio**: `play-sound` (cross-platform: aplay/paplay/afplay/PowerShell)
@@ -28,7 +28,9 @@ Claude Code (MessageDisplay hook)
 - **CLI** (`bin/voice-code.js`) — Entry point. `voice-code setup` runs guided wizard, `voice-code on/off/toggle` manages hook.
 - **Hook bridge** (`scripts/tts-bridge.js`) — Receives streaming text from Claude Code's `MessageDisplay` hook via stdin. Accumulates chunks until sentence boundaries, then sends cleaned text to TTS.
 - **Text cleaner** (`src/text-cleaner.js`) — Uses `marked` to parse markdown. Strips fenced code blocks, keeps inline code content (drops backticks), replaces URLs with "link", repairs sentence flow.
-- **TTS client** (`src/tts-client.js`) — Calls Gemini TTS API (`gemini-3.1-flash-tts-preview`) with streaming. Returns PCM audio chunks.
+- **TTS client** (`src/tts-client.js`) — Routes to configured provider (Gemini, Azure, or Kokoro). Returns WAV audio buffer.
+- **TTS Azure** (`src/tts-client-azure.js`) — Azure Speech REST API client. Uses SSML, returns WAV buffer.
+- **TTS Kokoro** (`src/tts-client-kokoro.js`) — Local TTS using `kokoro-js` (ONNX). Lazy-loads model on first use only. Returns WAV buffer.
 - **Audio player** (`src/audio-player.js`) — Plays PCM audio via `play-sound` (cross-platform). Writes WAV to temp file, plays async.
 - **Config** (`~/.voice-code/config.json`) — Voice, API key path, playback settings. Created by setup wizard.
 
@@ -51,7 +53,9 @@ voice-code/
 │   └── tts-bridge.js        # MessageDisplay hook bridge
 ├── src/
 │   ├── text-cleaner.js      # Markdown → speech-ready text
-│   ├── tts-client.js        # Gemini TTS API wrapper
+│   ├── tts-client.js        # TTS router (Gemini/Azure/Kokoro)
+│   ├── tts-client-azure.js  # Azure Speech REST API client
+│   ├── tts-client-kokoro.js # Local Kokoro TTS (ONNX, lazy-loaded)
 │   ├── audio-player.js      # Cross-platform audio playback
 │   └── config.js            # Config load/save (~/.voice-code/config.json)
 └── hooks/
@@ -73,7 +77,7 @@ voice-code setup
 ## Commands
 
 ```bash
-voice-code setup             # Guided setup wizard
+voice-code setup             # Guided setup wizard (Gemini, Azure, or Kokoro)
 voice-code on                # Enable TTS hook
 voice-code off               # Disable TTS hook
 voice-code toggle            # Toggle TTS on/off
@@ -89,6 +93,15 @@ voice-code voices            # List available voices
 - **Output**: PCM WAV, mono, 24kHz, 16-bit, base64
 - **Streaming**: Supported on 3.1 Flash only
 - **Audio tags**: `[whispers]`, `[excitedly]`, etc. (no SSML)
+
+## Kokoro TTS (Local)
+
+- **Model**: `onnx-community/Kokoro-82M-v1.0-ONNX` (82M parameters)
+- **Auth**: None (fully local, no API key)
+- **Voices**: 28 options (default: `af_heart` — warm, natural)
+- **Output**: WAV, mono, 24kHz, 16-bit
+- **Quantization**: q8 (default), fp32, fp16, q4, q4f16
+- **First run**: Downloads ~80MB model, cached by transformers.js
 
 ## Commands
 

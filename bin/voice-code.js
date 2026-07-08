@@ -73,6 +73,7 @@ async function setup() {
     choices: [
       { name: 'Gemini (Google)', value: 'gemini' },
       { name: 'Azure Speech (Microsoft)', value: 'azure' },
+      { name: 'Kokoro (Local, free)', value: 'kokoro' },
     ],
     default: existingConfig.provider || 'gemini',
   });
@@ -82,6 +83,9 @@ async function setup() {
   if (provider === 'azure') {
     // Azure setup flow
     await setupAzure(existingConfig);
+  } else if (provider === 'kokoro') {
+    // Kokoro setup flow (local, no API key)
+    await setupKokoro(existingConfig);
   } else {
     // Gemini setup flow
     await setupGemini(existingConfig);
@@ -262,6 +266,52 @@ async function setupAzure(existingConfig) {
   console.log(`\n  ✓ Config saved to ${CONFIG_DIR}/config.json`);
 }
 
+async function setupKokoro(existingConfig) {
+  console.log('\n  Kokoro TTS (local, no API key needed)');
+  console.log('  Runs entirely on your machine using ONNX Runtime.\n');
+
+  // Import voice list
+  const { AVAILABLE_VOICES } = await import('../src/tts-client-kokoro.js');
+
+  console.log('  Choose a voice\n');
+
+  const voiceChoices = AVAILABLE_VOICES.map(v => ({
+    name: `${v.id.padEnd(16)} ${v.grade.padEnd(4)} ${v.gender.padEnd(8)} ${v.traits}`,
+    value: v.id,
+  }));
+
+  const kokoroVoice = await select({
+    message: 'Select a voice:',
+    choices: voiceChoices,
+    default: existingConfig.kokoroVoice || 'af_heart',
+  });
+
+  // Preview
+  const doPreview = await confirm({
+    message: `Preview ${kokoroVoice}? (first run downloads the model)`,
+    default: true,
+  });
+
+  if (doPreview) {
+    console.log(`\n  🔊 Playing preview for ${kokoroVoice}...`);
+    console.log('  (First run downloads ~80MB model — this may take a moment)\n');
+
+    try {
+      const wav = await synthesize(`Hello! I'm ${kokoroVoice}. I'll be reading Claude's responses for you.`, {
+        voice: kokoroVoice,
+        provider: 'kokoro',
+      });
+
+      await playAudio(wav);
+    } catch (err) {
+      console.error(`  ✗ Preview failed: ${err.message}`);
+    }
+  }
+
+  saveConfig({ provider: 'kokoro', kokoroVoice, enabled: true });
+  console.log(`\n  ✓ Config saved to ${CONFIG_DIR}/config.json`);
+}
+
 async function promptGeminiKey() {
   const key = await password({
     message: 'Enter your Gemini API key:',
@@ -408,6 +458,19 @@ async function cmdVoices() {
     } catch (err) {
       console.error(`  ✗ Failed to fetch voices: ${err.message}`);
     }
+  } else if (config.provider === 'kokoro') {
+    console.log('\n🎤 Kokoro voices (local):\n');
+    try {
+      const voices = await fetchProviderVoices();
+      const current = config.kokoroVoice;
+      for (const v of voices) {
+        const marker = v.name === current ? ' (current)' : '';
+        console.log(`  ${v.name.padEnd(16)} ${v.grade.padEnd(4)} ${v.gender.padEnd(8)} ${v.locale}  ${v.traits}${marker}`);
+      }
+      console.log(`\nTotal: ${voices.length} voices`);
+    } catch (err) {
+      console.error(`  ✗ Failed to list voices: ${err.message}`);
+    }
   } else {
     console.log('\n🎤 Gemini voices:\n');
     for (const v of VOICES) {
@@ -527,7 +590,7 @@ switch (command) {
     console.log(`
 🎤 Voice Code — Text-to-speech for Claude Code
 
-Providers: Gemini (Google), Azure Speech (Microsoft)
+Providers: Gemini (Google), Azure Speech (Microsoft), Kokoro (Local, free)
 
 Usage:
   voice-code setup          Guided setup wizard (choose provider & voice)

@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { getApiKey, loadConfig } from './config.js';
 import { log } from './logger.js';
 import { synthesize as azureSynthesize, listVoices as azureListVoices } from './tts-client-azure.js';
+import { synthesize as kokoroSynthesize, listVoices as kokoroListVoices, resetClient as resetKokoroClient } from './tts-client-kokoro.js';
 
 let clientInstance = null;
 
@@ -21,7 +22,7 @@ Style: The "Vocal Smile": The soft palate is raised to keep the tone bright, sun
 ## Transcript:`;
 
 /**
- * Synthesize text to audio. Routes to the configured provider (Gemini or Azure).
+ * Synthesize text to audio. Routes to the configured provider (Gemini, Azure, or Kokoro).
  * Returns Buffer of WAV audio (PCM, mono, 24kHz, 16-bit).
  */
 export async function synthesize(text, options = {}) {
@@ -29,6 +30,10 @@ export async function synthesize(text, options = {}) {
 
   if (options.provider === 'azure' || config.provider === 'azure') {
     return azureSynthesize(text, options);
+  }
+
+  if (options.provider === 'kokoro' || config.provider === 'kokoro') {
+    return kokoroSynthesize(text, options);
   }
 
   return synthesizeGemini(text, options);
@@ -41,6 +46,9 @@ export async function listVoices() {
   const config = loadConfig();
   if (config.provider === 'azure') {
     return azureListVoices();
+  }
+  if (config.provider === 'kokoro') {
+    return kokoroListVoices();
   }
   return null; // Gemini voices are hardcoded in the CLI
 }
@@ -191,4 +199,5 @@ function pcmToWav(pcmData, options = {}) {
  */
 export function resetClient() {
   clientInstance = null;
+  resetKokoroClient();
 }

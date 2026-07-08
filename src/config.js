@@ -6,7 +6,7 @@ const CONFIG_DIR = join(homedir(), '.voice-code');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 const DEFAULTS = {
-  provider: 'gemini',            // 'gemini' or 'azure'
+  provider: 'gemini',            // 'gemini', 'azure', or 'kokoro'
   voice: 'Kore',
   model: 'gemini-3.1-flash-tts-preview',
   enabled: true,
@@ -15,6 +15,8 @@ const DEFAULTS = {
   azureKey: null,                // Azure Speech resource key
   azureRegion: null,             // Azure region (e.g., 'eastus')
   azureVoice: 'en-US-JennyNeural', // Azure default voice
+  kokoroVoice: 'af_heart',      // Kokoro default voice
+  kokoroDtype: 'q8',            // Quantization: fp32, fp16, q8, q4, q4f16
 };
 
 export function getConfigPath() {
