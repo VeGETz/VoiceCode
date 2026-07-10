@@ -2,7 +2,18 @@ import { GoogleGenAI } from '@google/genai';
 import { getApiKey, loadConfig } from './config.js';
 import { log } from './logger.js';
 import { synthesize as azureSynthesize, listVoices as azureListVoices } from './tts-client-azure.js';
-import { synthesize as kokoroSynthesize, listVoices as kokoroListVoices, resetClient as resetKokoroClient } from './tts-client-kokoro.js';
+
+let kokoroClient = null;
+
+// kokoro-js pulls in @huggingface/transformers, which can fail to resolve
+// under pnpm's strict node_modules (see onnxruntime-common issue). Load it
+// lazily so non-Kokoro users never hit that import.
+async function getKokoroClient() {
+  if (!kokoroClient) {
+    kokoroClient = await import('./tts-client-kokoro.js');
+  }
+  return kokoroClient;
+}
 
 let clientInstance = null;
 
@@ -33,6 +44,7 @@ export async function synthesize(text, options = {}) {
   }
 
   if (options.provider === 'kokoro' || config.provider === 'kokoro') {
+    const { synthesize: kokoroSynthesize } = await getKokoroClient();
     return kokoroSynthesize(text, options);
   }
 
@@ -48,6 +60,7 @@ export async function listVoices() {
     return azureListVoices();
   }
   if (config.provider === 'kokoro') {
+    const { listVoices: kokoroListVoices } = await getKokoroClient();
     return kokoroListVoices();
   }
   return null; // Gemini voices are hardcoded in the CLI
@@ -199,5 +212,5 @@ function pcmToWav(pcmData, options = {}) {
  */
 export function resetClient() {
   clientInstance = null;
-  resetKokoroClient();
+  kokoroClient?.resetClient();
 }

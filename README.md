@@ -2,14 +2,14 @@
 
 > **Claude Code, out loud.** Stop reading the chat — let Claude speak its responses in real-time with natural-sounding neural voices.
 
-Voice Code hooks into Claude Code's streaming output, strips code blocks and markdown, and speaks the text aloud using **Gemini TTS** or **Azure Speech**. Hands-free coding, finally.
+Voice Code hooks into Claude Code's streaming output, strips code blocks and markdown, and speaks the text aloud using **Gemini TTS**, **Azure Speech**, or **Kokoro** (local, free, no API key). Hands-free coding, finally.
 
 ## ✨ Features
 
 - **Real-time streaming** — audio starts before Claude finishes typing
 - **Smart text cleaning** — code blocks skipped, inline code kept, URLs and acronyms handled naturally
-- **30+ neural voices** — Gemini voices (Kore, Puck, Fenrir...) and Azure voices (Jenny, Guy, Aria...)
-- **Two TTS providers** — Google Gemini and Microsoft Azure Speech
+- **30+ neural voices** — Gemini voices (Kore, Puck, Fenrir...), Azure voices (Jenny, Guy, Aria...), and 28 Kokoro voices
+- **Three TTS providers** — Google Gemini, Microsoft Azure Speech, or Kokoro (local ONNX model, free, offline)
 - **Cross-platform** — Linux (ALSA/PulseAudio), macOS (afplay), Windows (PowerShell)
 - **Zero config** — `voice-code setup` walks you through everything
 
@@ -58,6 +58,7 @@ That's it. Claude will start speaking.
 | `voice-code on` | Enable TTS |
 | `voice-code off` | Disable TTS |
 | `voice-code toggle` | Toggle TTS on/off |
+| `voice-code shutup` | Stop all audio immediately (clears queue, kills worker) |
 | `voice-code test [text]` | Test TTS with sample text |
 | `voice-code voices` | List available voices |
 | `voice-code uninstall` | Remove hook and config, then uninstall package |
@@ -88,6 +89,12 @@ export AZURE_SPEECH_REGION=eastus
 
 Or enter them during `voice-code setup`.
 
+### Kokoro (Local, free)
+
+No API key, no account, no cost — runs entirely on your machine via ONNX.
+
+First use downloads the ~80MB model (`onnx-community/Kokoro-82M-v1.0-ONNX`), cached afterward. Pick it during `voice-code setup`.
+
 ## 🎙️ Voices
 
 ### Gemini Voices
@@ -106,6 +113,14 @@ Hundreds of neural voices across 100+ languages. Fetched live from the Azure API
 voice-code voices
 ```
 
+### Kokoro Voices
+
+28 local voices (US/GB, male/female), default `af_heart` (warm, natural).
+
+```bash
+voice-code voices
+```
+
 ## ⚙️ Configuration
 
 Config lives at `~/.voice-code/config.json`:
@@ -119,34 +134,49 @@ Config lives at `~/.voice-code/config.json`:
   "playbackDevice": null,
   "azureKey": null,
   "azureRegion": null,
-  "azureVoice": "en-US-JennyNeural"
+  "azureVoice": "en-US-JennyNeural",
+  "kokoroVoice": "af_heart",
+  "kokoroDtype": "q8"
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `provider` | `"gemini"` or `"azure"` |
+| `provider` | `"gemini"`, `"azure"`, or `"kokoro"` |
 | `voice` | Gemini voice name |
+| `model` | Gemini TTS model (default `gemini-3.1-flash-tts-preview`) |
+| `apiKeyEnv` | Env var name to read the Gemini key from (default `GEMINI_API_KEY`) |
 | `azureVoice` | Azure voice name (e.g., `en-US-JennyNeural`) |
 | `azureRegion` | Azure region (e.g., `eastus`, `westeurope`) |
+| `azureKey` | Azure Speech resource key |
+| `kokoroVoice` | Kokoro voice name (default `af_heart`) |
+| `kokoroDtype` | Kokoro model quantization: `fp32`, `fp16`, `q8`, `q4`, `q4f16` (default `q8`) |
 | `playbackDevice` | Audio device override (null = auto-detect) |
+
+Logs are written to `~/.voice-code/voice-code.log` — view with `voice-code log [n]`.
 
 ## 🔧 How It Works
 
 ```
 Claude Code (MessageDisplay hook)
-  → tts-bridge.js (Node.js)
-    → accumulate text chunks into sentences
-    → strip code blocks, clean markdown
-    → Gemini TTS or Azure Speech API
-      → WAV audio playback
+  → tts-bridge.js (per response chunk, via stdin)
+    → clean markdown, split into sentence-sized chunks
+    → append complete chunks to a shared queue file
+    → spawn tts-worker.js (detached) if none is already running
+        tts-worker.js
+          → reads the queue, synthesizes via Gemini, Azure, or Kokoro
+          → pre-fetches the next sentence while the current one plays
+          → re-checks the queue after each pass for late arrivals
+          → releases its lock file and exits when the queue is empty
 ```
 
-1. Claude Code's `MessageDisplay` hook streams each response chunk to `tts-bridge.js`
-2. Text is buffered until sentence boundaries (`.`, `!`, `?`) for natural speech flow
+1. Claude Code's `MessageDisplay` hook streams each response chunk to `tts-bridge.js` via stdin
+2. Text is buffered and cleaned continuously; complete sentence-sized chunks (~300 chars, split on `.`, `!`, `?`) are appended to a shared queue file in the OS temp dir
 3. Code blocks are stripped entirely; inline code keeps content but drops backticks
 4. URLs become "link", acronyms are spelled out, symbols are expanded
-5. Synthesized audio is played asynchronously — doesn't block Claude
+5. `tts-bridge.js` spawns a detached `tts-worker.js` process guarded by a lock file — if a worker is already running, new chunks just get queued for it
+6. `tts-worker.js` synthesizes sentences via the configured provider (Gemini, Azure, or Kokoro) and plays them in order, pre-fetching the next sentence's audio while the current one plays so synthesis latency is hidden behind playback
+7. This all happens out-of-process from the hook, so Claude Code is never blocked waiting on audio
 
 ## 🖥️ Cross-Platform Audio
 
