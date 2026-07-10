@@ -10,7 +10,22 @@ let kokoroClient = null;
 // lazily so non-Kokoro users never hit that import.
 async function getKokoroClient() {
   if (!kokoroClient) {
-    kokoroClient = await import('./tts-client-kokoro.js');
+    try {
+      kokoroClient = await import('./tts-client-kokoro.js');
+    } catch (err) {
+      if (err.code === 'ERR_MODULE_NOT_FOUND' && /onnxruntime-common/.test(err.message)) {
+        throw new Error(
+          'Kokoro TTS failed to load: onnxruntime-common could not be resolved.\n' +
+          "This is a known issue when voice-code is installed with pnpm — @huggingface/transformers " +
+          "(a kokoro-js dependency) doesn't declare that dependency, and pnpm's strict node_modules " +
+          "can't resolve it as a result.\n" +
+          'Fix: reinstall voice-code with npm instead of pnpm:\n' +
+          '  npm install -g @vegetz/voice-code\n' +
+          '(Gemini and Azure are unaffected — this only applies to the Kokoro provider.)'
+        );
+      }
+      throw err;
+    }
   }
   return kokoroClient;
 }

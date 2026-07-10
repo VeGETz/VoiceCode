@@ -16,13 +16,15 @@ Voice Code hooks into Claude Code's streaming output, strips code blocks and mar
 ## 🚀 Install
 
 ```bash
-pnpm install -g @vegetz/voice-code
+npm install -g @vegetz/voice-code
 ```
+
+> **Why npm, not pnpm?** If you want the **Kokoro** (local) provider, install with npm. `kokoro-js` depends on `@huggingface/transformers`, which imports `onnxruntime-common` without declaring it as a dependency — pnpm's strict `node_modules` can't resolve that undeclared import and `voice-code setup` crashes when Kokoro loads. npm's flat `node_modules` doesn't have this restriction. If you only use Gemini or Azure and never touch Kokoro, `pnpm install -g @vegetz/voice-code` works fine too.
 
 Or install from git:
 
 ```bash
-pnpm install -g https://github.com/VeGETz/VoiceCode.git
+npm install -g https://github.com/VeGETz/VoiceCode.git
 ```
 
 Or clone and install locally:
@@ -30,7 +32,7 @@ Or clone and install locally:
 ```bash
 git clone https://github.com/VeGETz/VoiceCode.git
 cd VoiceCode
-pnpm install -g .
+npm install -g .
 ```
 
 Requires Node.js 18+.
